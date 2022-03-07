@@ -1,0 +1,62 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rclone-config
+data:
+  .rclone.conf: |-
+    [mediafs]
+    type = drive
+    scope = drive.readonly
+    root_folder_id = Computers/Websites
+    token = {"access_token":"ACCESS_TOKEN","token_type":"Bearer","refresh_token":"REFRESH_TOKEN","expiry":"2022-01-01T00:00:00.141665201Z"}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rclonemount
+spec:
+  replicas: 1
+  selector:
+     matchLabels:
+       app.kubernetes.io/name: rclonemount
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rclonemount
+    spec:
+      containers:
+      - name: rclonemount
+        image: esara/rclonemount
+        env:
+          - name: RemotePath
+            value: "mediaefs:"
+          - name: MountPoint
+            value: "/var/lib/nginx/html"
+          - name: MountCommands
+            value: "--allow-other --uid 1000 --gid 1000 --umask 022 --default-permissions --allow-non-empty --dir-cache-time 168h --poll-interval 5m --buffer-size 128M"
+        securityContext:
+          capabilities:
+            add:
+              - SYS_ADMIN
+              - DAC_READ_SEARCH
+            - name: rclone-volume
+              mountPath: /config
+              readOnly: true
+      volumes:
+        - name: rclone-volume
+          configMap:
+            name: rclone-config
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rclonemount
+  labels:
+    app.kubernetes.io/name: rclonemount
+spec:
+  ports:
+    - name: http-rclonemount
+      port: 80
+  selector:
+    app.kubernetes.io/name: rclonemount

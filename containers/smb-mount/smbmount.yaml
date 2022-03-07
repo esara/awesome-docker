@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smbmount
+spec:
+  replicas: 1
+  selector:
+     matchLabels:
+       app.kubernetes.io/name: smbmount
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: smbmount
+    spec:
+      containers:
+      - name: smbmount
+        image: esara/smbmount
+        env:
+          - name: SERVERPATH
+            value: "//synology/share/website"
+          - name: MOUNTOPTIONS
+            value: "vers=2.0,uid=1000,gid=1000,ro,user=username,pass=password"
+          - name: MOUNTPOUNT
+            value: "/var/lib/nginx/html"
+        securityContext:
+          capabilities:
+            add:
+              - SYS_ADMIN
+              - DAC_READ_SEARCH
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: smbmount
+  labels:
+    app.kubernetes.io/name: smbmount
+spec:
+  ports:
+    - name: http-smbmount
+      port: 80
+  selector:
+    app.kubernetes.io/name: smbmount
